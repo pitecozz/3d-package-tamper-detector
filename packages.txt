@@ -1,0 +1,2 @@
+# Dependências Debian necessárias para Open3D e OpenCV rodarem
+libgl1

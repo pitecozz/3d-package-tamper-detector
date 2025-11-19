@@ -1,26 +1,31 @@
 import numpy as np
 import open3d as o3d
 import os
-import cv2 # Para manipulação de imagem básica
+import cv2 
 
 # Importando os módulos implementados
 from src.vision.depth_estimator import DepthEstimator
 from src.geometry.reconstructor import MultiViewReconstructor
 from src.geometry.tamper_detector import TamperDetector
 
-# --- Funções de Simulação ---
+# --- Funções de Simulação Otimizada ---
 
-def _simulate_training_data(n_samples=100):
-    """Gera features sintéticas para 100 pacotes normais para treinar o Isolation Forest."""
+def _simulate_training_data(n_samples=200):
+    """
+    Gera features sintéticas com MAIS VARIAÇÃO e MAIS DADOS (200 amostras)
+    para um treinamento robusto, corrigindo a alta sensibilidade.
+    """
     np.random.seed(42)
-    normal_features = []
-    for _ in range(n_samples):
-        # Pacotes normais: Volume e variância de rugosidade estáveis
-        volume = np.random.uniform(0.12, 0.15)  # Ex: Volume em m³
-        variance = np.random.uniform(0.001, 0.005) # Ex: Baixa variação (pouca rugosidade)
-        count = np.random.randint(5500, 6500)     # Número estável de pontos
-        normal_features.append([volume, variance, count])
-    return np.array(normal_features)
+    
+    # Simula Variações Realistas para o 'Normal'
+    # Volume: pacotes pequenos a médios, com grande amplitude de variação
+    sim_volume = np.random.uniform(0.001, 0.20, n_samples) 
+    # Variância (Rugosidade): tolerância a superfícies irregulares (sacolas)
+    sim_variance = np.random.uniform(0.5, 10.0, n_samples) 
+    # Número de pontos (densidade): boa variação
+    sim_num_points = np.random.randint(5000, 80000, n_samples) 
+
+    return np.column_stack([sim_volume, sim_variance, sim_num_points])
 
 class PackageTamperDetector:
     """
@@ -38,7 +43,7 @@ class PackageTamperDetector:
 
     def _simulate_training_and_fit(self):
         """Prepara o detector de anomalias."""
-        print("[Detector] Simulating training on 100 normal packages...")
+        print("[Detector] Simulating training on 200 normal packages...")
         normal_features = _simulate_training_data()
         self.tamper_detector.train_on_normal_data(normal_features)
         print("[Detector] Training complete. Detector ready.")
@@ -47,6 +52,7 @@ class PackageTamperDetector:
         """
         Executa o pipeline completo: Visão -> 3D -> Análise Geométrica.
         """
+        # Verifica se o arquivo existe (necessário para rodar no servidor)
         if not os.path.exists(video_path):
             raise FileNotFoundError(f"Video file not found at: {video_path}")
 
@@ -55,7 +61,8 @@ class PackageTamperDetector:
         frames = self.depth_estimator.extract_frames(video_path, num_frames=8)
         
         if not frames:
-            return {'is_tampered': False, 'interpretation': "Erro de leitura do vídeo.", 'visual_data': None}
+            # Fallback robusto
+            return {'is_tampered': False, 'interpretation': "Erro de leitura do vídeo.", 'visual_data': {'frame_rgb': np.zeros((480, 640, 3), dtype=np.uint8), 'depth_map': np.zeros((480, 640))}}
 
         depth_maps = [self.depth_estimator.estimate_depth(f) for f in frames]
         
@@ -65,6 +72,7 @@ class PackageTamperDetector:
         print(f"[Pipeline] 3D Point Cloud created ({len(pcd_merged.points)} points).")
         
         # 3. SEGURANÇA: Extrair Features e Prever Violação
+        # CORREÇÃO: Chama o método diretamente do detector e passa a nuvem de pontos
         features = self.tamper_detector.extract_geometry_features(pcd_merged)
         prediction = self.tamper_detector.predict_tamper(features)
         

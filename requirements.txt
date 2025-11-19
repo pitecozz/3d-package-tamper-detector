@@ -4,9 +4,12 @@ transformers
 opencv-python-headless
 numpy
 scikit-learn
-open3d             # Mudei para instalar a versão mais recente compatível
-Pillow             # Adicionando explicitamente para manipulação de imagem
-scipy              # Adicionando para utilidades matemáticas
+open3d
+Pillow
+scipy
+
+# Visualização Aprimorada
+matplotlib
 
 # Deploy e Demo
 gradio

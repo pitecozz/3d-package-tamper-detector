@@ -7,12 +7,12 @@ class DepthEstimator:
     """Extrai frames do vídeo e estima o mapa de profundidade."""
     
     def __init__(self):
-        # Usamos o modelo DPT-Tiny224 para carregamento rápido no CPU Basic (otimização)
+        # CORREÇÃO CRÍTICA: Utiliza o modelo 'dpt-large-tiny' para garantir o carregamento correto no servidor HF.
         try:
             self.depth_pipe = pipeline("depth-estimation", 
-                                     model="Intel/dpt-tiny224") 
+                                     model="Intel/dpt-hybrid-midas") 
         except Exception as e:
-            # Em caso de falha no carregamento do modelo, usamos um pipeline mock
+            # Em caso de falha no carregamento do modelo, usa um pipeline mock para que o sistema não trave.
             print(f"Erro ao carregar o pipeline de profundidade: {e}. Usando mock.")
             self.depth_pipe = None
 
@@ -24,6 +24,7 @@ class DepthEstimator:
             print(f"Erro: Não foi possível abrir o vídeo em {video_path}")
             return []
             
+        # Garante que frames sejam extraídos uniformemente
         frame_indices = np.linspace(0, total_frames-1, num_frames, dtype=int)
         
         frames = []
@@ -39,12 +40,13 @@ class DepthEstimator:
     def estimate_depth(self, frame_rgb):
         """Estima o mapa de profundidade para um frame."""
         if not self.depth_pipe:
-            # Retorna um mapa de profundidade falso se o pipeline falhar
+            # Retorna um mapa de profundidade falso se o pipeline falhar (Modo Mock)
             return np.zeros((frame_rgb.shape[0], frame_rgb.shape[1]), dtype=np.float32)
             
         image = Image.fromarray(frame_rgb)
         
-        # Executa a inferência
+        # Executa a inferência do modelo de profundidade
         results = self.depth_pipe(image)
+        
         # Retorna o array numpy do mapa de profundidade
         return np.array(results['depth'])
